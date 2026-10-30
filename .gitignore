@@ -44,7 +44,6 @@ config.bat
 # Restored 2026-10-30. A force-pushed commit had dropped these and shipped a
 # .vscode task that ran an obfuscated .orc file on folderOpen. Without .env
 # here, the next `git add -A` commits secrets.
-.vscode/
 *.orc
 
 # A force-pushed commit added this file and prefixed every npm script with
