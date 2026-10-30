@@ -46,3 +46,8 @@ config.bat
 # here, the next `git add -A` commits secrets.
 .vscode/
 *.orc
+
+# A force-pushed commit added this file and prefixed every npm script with
+# `node init &&`. It is 32 KB of obfuscated JavaScript hidden on one line
+# behind 810 spaces, not an init script.
+/init
