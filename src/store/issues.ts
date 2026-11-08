@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import * as api from '../lib/api'
 
 /*
  * NOTE: this is a deliberate copy of the web app's store of the same name.
@@ -37,9 +38,70 @@ export type ActivityEntry = {
   summary: string
 }
 
+/* ----------------------------------------------------- server mapping --- */
+
+/**
+ * The same mapping the web app uses, and the same two gaps worth naming.
+ *
+ * The board has a `backlog` column the server has no status for; treating
+ * "not in a sprint" as the backlog is how a backlog works, so that half is
+ * honest. The server has BLOCKED and the board has no column for it, so a
+ * blocked task lands in `todo` with nothing on the card saying so. That
+ * needs a column, which is a design decision rather than a mapping one.
+ */
+function statusFromServer(status: string, sprintId: string | null): Status {
+  if (status === 'COMPLETED') return 'done'
+  if (status === 'REVIEW') return 'review'
+  if (status === 'IN_PROGRESS') return 'in_progress'
+  return sprintId ? 'todo' : 'backlog'
+}
+
+function statusToServer(status: Status): api.TaskStatus {
+  if (status === 'done') return 'COMPLETED'
+  if (status === 'review') return 'REVIEW'
+  if (status === 'in_progress') return 'IN_PROGRESS'
+  return 'PENDING'
+}
+
+function priorityFromServer(priority: string): Priority {
+  if (priority === 'URGENT') return 'highest'
+  if (priority === 'HIGH') return 'high'
+  if (priority === 'LOW') return 'low'
+  return 'medium'
+}
+
+export function issueFromTask(task: api.ServerTask): Issue {
+  const sprintId = task.sprintId ?? null
+  return {
+    key: task.key ?? `#${task.id.slice(0, 6)}`,
+    // The uuid, kept because `key` is what people say and not what the API
+    // takes. Without it no edit made here could reach the server.
+    serverId: task.id,
+    type: ((task.type ?? 'TASK').toLowerCase()) as IssueType,
+    title: task.title,
+    description: task.description ?? '',
+    status: statusFromServer(task.status, sprintId),
+    priority: priorityFromServer(task.priority),
+    assignee: task.assignedToId ?? null,
+    reporter: 'Unknown',
+    points: task.storyPoints ?? null,
+    labels: task.tags ?? [],
+    epic: task.epicId ?? null,
+    links: [],
+    sprint: sprintId,
+    created: String(task.createdAt ?? '').slice(0, 10),
+    comments: [],
+    // Nothing on the server records an activity trail. Empty on a live
+    // issue rather than invented history beside real work.
+    activity: [],
+  }
+}
+
 export type Issue = {
   /** Human key, e.g. CN-101. The id users actually speak out loud. */
   key: string
+  /** The server's uuid, when this issue came from one. */
+  serverId?: string
   type: IssueType
   title: string
   description: string
@@ -257,6 +319,11 @@ let sequence = 200
 
 type IssuesState = {
   issues: Issue[]
+  /** 'demo' until the server answers; nothing writes through in demo. */
+  source: 'demo' | 'server'
+  loading: boolean
+  error: string | null
+  hydrate: () => Promise<void>
   update: (key: string, patch: Partial<Issue>, activitySummary?: string) => void
   move: (key: string, status: Status, index: number) => void
   comment: (key: string, body: string) => void
@@ -269,8 +336,27 @@ function stamp(actor: string, summary: string): ActivityEntry {
   return { id: `a${Math.random().toString(36).slice(2, 9)}`, actor, at: 'just now', summary }
 }
 
-export const useIssuesStore = create<IssuesState>((set) => ({
+export const useIssuesStore = create<IssuesState>((set, get) => ({
   issues: SEED,
+  source: 'demo',
+  loading: false,
+  error: null,
+
+  hydrate: async () => {
+    if (!api.isConfigured) return
+    set({ loading: true, error: null })
+    try {
+      const tasks = await api.allTasks(200)
+      set({ issues: tasks.map(issueFromTask), source: 'server', loading: false })
+    } catch (cause) {
+      // The seed stays visible, but `source` does not become 'server', so
+      // nothing below tries to post an edit that would fail anyway.
+      set({
+        loading: false,
+        error: cause instanceof Error ? cause.message : 'Could not load issues',
+      })
+    }
+  },
 
   update: (key, patch, activitySummary) =>
     set((state) => ({

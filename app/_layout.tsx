@@ -27,6 +27,13 @@ function useAuthGate() {
   }, [])
 
   useEffect(() => {
+    // Turn a stored bearer token back into a session. A no-op with no
+    // backend configured and no token, so it costs nothing in the demo
+    // build; without it a cold start drops a real sign-in on the floor.
+    void useSession.getState().restore()
+  }, [])
+
+  useEffect(() => {
     if (!hydrated) return
     const inAuthGroup = segments[0] === '(auth)'
 

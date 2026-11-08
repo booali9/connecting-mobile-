@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -28,6 +28,11 @@ export default function Board() {
   const t = useTheme()
   const router = useRouter()
   const issues = useIssuesStore((s) => s.issues)
+  // One call on mount; the store ignores it when no backend is set.
+  const hydrate = useIssuesStore((s) => s.hydrate)
+  useEffect(() => {
+    void hydrate()
+  }, [hydrate])
   const move = useIssuesStore((s) => s.move)
 
   const [status, setStatus] = useState<Status>('todo')

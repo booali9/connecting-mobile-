@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as api from '../lib/api'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
@@ -97,6 +98,7 @@ type SessionState = {
   resetRequests: string[]
 
   signIn: (email: string, password: string) => Promise<string | null>
+  restore: () => Promise<void>
   register: (input: {
     name: string
     email: string
@@ -108,6 +110,24 @@ type SessionState = {
   signOut: () => void
 }
 
+/**
+ * The server knows three roles, this app knows two: it has no platform
+ * admin screens. ADMIN lands on the manager side, which is the most it can
+ * usefully do here, rather than being refused a session it is entitled to.
+ */
+function accountFromServer(user: api.ServerUser): Account {
+  return {
+    id: user._id,
+    name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+    email: user.email,
+    // Never the real one. A server account has no password this app should
+    // hold, and the seeded ones only have it because they are seeds.
+    password: '',
+    role: user.role === 'DEVELOPER' ? 'employee' : 'company_admin',
+    company: user.company ?? '',
+  }
+}
+
 export const useSession = create<SessionState>()(
   persist(
     (set, get) => ({
@@ -116,6 +136,28 @@ export const useSession = create<SessionState>()(
       resetRequests: [],
 
       signIn: async (email, password) => {
+        // A configured backend is the real thing. No falling back to the
+        // seeded list on failure: that would sign somebody in with a wrong
+        // password and look like success.
+        if (api.isConfigured) {
+          try {
+            const user = await api.login(email.trim(), password)
+            const account = accountFromServer(user)
+            set((state) => ({
+              accounts: [
+                ...state.accounts.filter((a) => a.id !== account.id),
+                account,
+              ],
+              currentId: account.id,
+            }))
+            return null
+          } catch (error) {
+            return error instanceof Error
+              ? error.message
+              : 'That email and password do not match.'
+          }
+        }
+
         await new Promise((r) => setTimeout(r, 500))
         const account = get().accounts.find(
           (a) => a.email.toLowerCase() === email.trim().toLowerCase()
@@ -127,6 +169,27 @@ export const useSession = create<SessionState>()(
         }
         set({ currentId: account.id })
         return null
+      },
+
+      /** Turn a stored token back into a session, once, on start. */
+      restore: async () => {
+        if (!api.isConfigured) return
+        if (!(await api.restoreToken())) return
+        try {
+          const user = await api.me()
+          const account = accountFromServer(user)
+          set((state) => ({
+            accounts: [
+              ...state.accounts.filter((a) => a.id !== account.id),
+              account,
+            ],
+            currentId: account.id,
+          }))
+        } catch {
+          // A rejected token must not leave the app looking signed in.
+          await api.setToken(null)
+          set({ currentId: null })
+        }
       },
 
       register: async ({ name, email, company, password, role }) => {
@@ -154,7 +217,10 @@ export const useSession = create<SessionState>()(
         set((state) => ({ resetRequests: [...state.resetRequests, email.trim().toLowerCase()] }))
       },
 
-      signOut: () => set({ currentId: null }),
+      signOut: () => {
+        if (api.isConfigured) void api.logout()
+        set({ currentId: null })
+      },
     }),
     {
       name: 'connecting-session',
