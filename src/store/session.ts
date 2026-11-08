@@ -117,14 +117,14 @@ type SessionState = {
  */
 function accountFromServer(user: api.ServerUser): Account {
   return {
-    id: user._id,
+    id: user.id,
     name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
     email: user.email,
     // Never the real one. A server account has no password this app should
     // hold, and the seeded ones only have it because they are seeds.
     password: '',
     role: user.role === 'DEVELOPER' ? 'employee' : 'company_admin',
-    company: user.company ?? '',
+    company: api.companyIdOf(user) ?? '',
   }
 }
 

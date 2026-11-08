@@ -125,13 +125,31 @@ export async function request<T>(path: string, options: Options = {}): Promise<T
 
 export type ServerRole = 'ADMIN' | 'MANAGER' | 'DEVELOPER'
 
+/**
+ * `id`, not `_id`. The backend's `sendTokenResponse` writes `id`; `_id` is
+ * only the name of the parameter it takes. Reading `_id` gave every account
+ * an undefined id, so a successful sign-in left the app looking signed out.
+ *
+ * `company` and `companyId` are both optional because the endpoints
+ * disagree: login sends a flat id, `/api/auth/me` answers the whole row,
+ * where the id is in `companyId` and `company` is an object.
+ */
 export type ServerUser = {
-  _id: string
+  id: string
   email: string
   firstName: string
   lastName: string
   role: ServerRole
-  company?: string | null
+  companyId?: string | null
+  company?: string | { id?: string; name?: string } | null
+}
+
+/** The company id, whichever of the three shapes the server used. */
+export function companyIdOf(user: ServerUser): string | null {
+  if (typeof user.companyId === 'string') return user.companyId
+  if (typeof user.company === 'string') return user.company
+  if (user.company && typeof user.company === 'object') return user.company.id ?? null
+  return null
 }
 
 export async function login(email: string, password: string): Promise<ServerUser> {
