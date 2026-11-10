@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
 
@@ -24,9 +24,18 @@ export default function CompanyOverview() {
   const t = useTheme()
   const router = useRouter()
   const issues = useIssuesStore((s) => s.issues)
+  // The board, backlog and task screens hydrate; this one did not, so the
+  // home screen -- the first thing anyone sees after signing in -- listed the
+  // seeded CN-101..CN-104 while the database held CN-2..CN-13.
+  const hydrate = useIssuesStore((s) => s.hydrate)
+  useEffect(() => {
+    void hydrate()
+  }, [hydrate])
   const team = useTeamCheckIns()
 
-  const sprint = SPRINTS[0]
+  const sprints = useIssuesStore((s) => s.sprints)
+  // The server's when it answered, the seeded pair when it did not.
+  const sprint = sprints[0] ?? SPRINTS[0]
   const sprintIssues = useMemo(
     () => issues.filter((i) => i.sprint === sprint.id && i.type !== 'epic'),
     [issues, sprint.id]

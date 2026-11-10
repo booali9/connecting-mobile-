@@ -218,6 +218,30 @@ export async function allTasks(limit = 200): Promise<ServerTask[]> {
   return result.tasks ?? []
 }
 
+/* -------------------------------------------------------------- sprints --- */
+
+export type ServerSprint = {
+  id: string
+  name: string
+  state: 'PLANNED' | 'ACTIVE' | 'CLOSED'
+  goal?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  capacity?: number | null
+  [key: string]: unknown
+}
+
+/**
+ * The board groups by sprint. Without this the app used a hardcoded pair --
+ * 'S24' and 'S25', dated Dec 1 to Dec 15 -- while every server task carries a
+ * sprint uuid, so the header showed a sprint nobody was working in and the
+ * burn-down read 0 of 0 points beside a full board.
+ */
+export async function allSprints(): Promise<ServerSprint[]> {
+  const result = await request<{ sprints?: ServerSprint[] }>('/api/sprints')
+  return result.sprints ?? []
+}
+
 export async function updateTask(
   id: string,
   patch: Partial<ServerTask>

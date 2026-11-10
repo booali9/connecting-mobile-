@@ -36,7 +36,9 @@ export default function Board() {
   const move = useIssuesStore((s) => s.move)
 
   const [status, setStatus] = useState<Status>('todo')
-  const sprint = SPRINTS[0]
+  const sprints = useIssuesStore((s) => s.sprints)
+  // The server's when it answered, the seeded pair when it did not.
+  const sprint = sprints[0] ?? SPRINTS[0]
 
   const board = useMemo(() => selectBoard(issues, sprint.id), [issues, sprint.id])
   const current = board[status]

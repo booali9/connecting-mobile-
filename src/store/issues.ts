@@ -317,8 +317,38 @@ const SEED: Issue[] = [
 
 let sequence = 200
 
+export type SprintSummary = {
+  id: string
+  name: string
+  state: 'planned' | 'active' | 'closed'
+  /** "4 Nov – 18 Nov", or a note when the sprint has no dates. */
+  window: string
+  goal?: string | null
+  capacity?: number | null
+}
+
+/** A sprint's dates as the board header writes them. */
+function sprintWindow(start?: string | null, end?: string | null): string {
+  const label = (value?: string | null) =>
+    value
+      ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      : null
+  const from = label(start)
+  const to = label(end)
+  if (from && to) return `${from} – ${to}`
+  return from ?? to ?? 'no dates set'
+}
+
 type IssuesState = {
   issues: Issue[]
+  /**
+   * What the board can choose between: the server's sprints, or SPRINTS.
+   *
+   * The screens read a hardcoded pair dated Dec 1 to Dec 15 while every task
+   * from the server carried a sprint uuid, so the header named a sprint
+   * nothing belonged to and the burn-down read 0 of 0 points.
+   */
+  sprints: SprintSummary[]
   /** 'demo' until the server answers; nothing writes through in demo. */
   source: 'demo' | 'server'
   loading: boolean
@@ -338,6 +368,7 @@ function stamp(actor: string, summary: string): ActivityEntry {
 
 export const useIssuesStore = create<IssuesState>((set, get) => ({
   issues: SEED,
+  sprints: SPRINTS,
   source: 'demo',
   loading: false,
   error: null,
@@ -346,8 +377,20 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
     if (!api.isConfigured) return
     set({ loading: true, error: null })
     try {
-      const tasks = await api.allTasks(200)
-      set({ issues: tasks.map(issueFromTask), source: 'server', loading: false })
+      const [tasks, sprints] = await Promise.all([api.allTasks(200), api.allSprints()])
+      set({
+        issues: tasks.map(issueFromTask),
+        sprints: sprints.map((sprint) => ({
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state.toLowerCase() as 'planned' | 'active' | 'closed',
+          window: sprintWindow(sprint.startDate, sprint.endDate),
+          goal: sprint.goal ?? null,
+          capacity: sprint.capacity ?? null,
+        })),
+        source: 'server',
+        loading: false,
+      })
     } catch (cause) {
       // The seed stays visible, but `source` does not become 'server', so
       // nothing below tries to post an edit that would fail anyway.

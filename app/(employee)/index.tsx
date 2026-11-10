@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -33,6 +34,13 @@ export default function Today() {
   const mine = useCheckInStore((s) => s.mine)
   const streak = useCheckInStore((s) => s.streak)
   const issues = useIssuesStore((s) => s.issues)
+  // The board, backlog and task screens hydrate; this one did not, so the
+  // home screen -- the first thing anyone sees after signing in -- listed the
+  // seeded CN-101..CN-104 while the database held CN-2..CN-13.
+  const hydrate = useIssuesStore((s) => s.hydrate)
+  useEffect(() => {
+    void hydrate()
+  }, [hydrate])
 
   const done = mine.status === 'complete'
   const myIssues = issues.filter((i) => i.type !== 'epic' && i.status !== 'done')

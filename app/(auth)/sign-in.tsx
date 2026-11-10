@@ -7,6 +7,7 @@ import { Button, Card, Input, Row, Text } from '../../src/components/ui'
 import { useTheme } from '../../src/theme/theme'
 import { space } from '../../src/theme/tokens'
 import { homeFor, useSession, validators } from '../../src/store/session'
+import { isConfigured } from '../../src/lib/api'
 
 const DEMO = [
   { email: 'jordan@acme.com', label: 'Company Manager' },
@@ -46,7 +47,18 @@ export default function SignIn() {
       setFormError(error)
       return
     }
-    const account = accounts.find((a) => a.email.toLowerCase() === email.trim().toLowerCase())
+    /*
+     * Ask the store who it just signed in, rather than searching the
+     * `accounts` captured when this component last rendered.
+     *
+     * That list is the seeded one: a server account is added by `signIn` and
+     * is not in the closure here, so the lookup missed, `?? 'employee'` took
+     * over, and a manager signing in with a real account was sent to the
+     * employee tabs. It only looked right because the seeded manager happens
+     * to use jordan@acme.com and the database's uses jordan@acme.test.
+     */
+    const { accounts: current, currentId } = useSession.getState()
+    const account = current.find((a) => a.id === currentId)
     router.replace(homeFor(account?.role ?? 'employee'))
   }
 
@@ -102,28 +114,35 @@ export default function SignIn() {
         </Link>
       </Card>
 
-      <Card style={{ gap: space.sm }}>
-        <Text variant="label">Demo accounts</Text>
-        <Text variant="caption" tone="muted">
-          Password is “password” for both.
-        </Text>
-        <View style={{ gap: space.sm }}>
-          {DEMO.map((demo) => (
-            <Button
-              key={demo.email}
-              label={`${demo.label} — ${demo.email}`}
-              variant="outline"
-              size="sm"
-              onPress={() => {
-                setEmail(demo.email)
-                setPassword('password')
-                setTouched({})
-                setFormError(null)
-              }}
-            />
-          ))}
-        </View>
-      </Card>
+      {/*
+        Only in the demo build. With EXPO_PUBLIC_API_URL set, sign-in goes to
+        the server and these two accounts do not exist there -- the card was
+        offering credentials that fail, with the password printed above them.
+      */}
+      {!isConfigured && (
+        <Card style={{ gap: space.sm }}>
+          <Text variant="label">Demo accounts</Text>
+          <Text variant="caption" tone="muted">
+            Password is “password” for both.
+          </Text>
+          <View style={{ gap: space.sm }}>
+            {DEMO.map((demo) => (
+              <Button
+                key={demo.email}
+                label={`${demo.label} — ${demo.email}`}
+                variant="outline"
+                size="sm"
+                onPress={() => {
+                  setEmail(demo.email)
+                  setPassword('password')
+                  setTouched({})
+                  setFormError(null)
+                }}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
     </AuthScreen>
   )
 }

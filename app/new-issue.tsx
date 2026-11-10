@@ -24,6 +24,9 @@ export default function NewIssue() {
   const t = useTheme()
   const router = useRouter()
   const create = useIssuesStore((s) => s.create)
+  const sprints = useIssuesStore((s) => s.sprints)
+  // The sprint this issue would join: the server's first, or the seeded one.
+  const currentSprint = sprints[0] ?? SPRINTS[0]
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -43,7 +46,7 @@ export default function NewIssue() {
       assignee,
       points,
       status: 'todo',
-      sprint: toSprint ? SPRINTS[0].id : null,
+      sprint: toSprint ? currentSprint.id : null,
     })
     router.replace(`/issue/${key}`)
   }
@@ -132,7 +135,7 @@ export default function NewIssue() {
       <Card style={{ gap: space.md }}>
         <Row>
           <View style={{ flex: 1 }}>
-            <Text variant="label">Add to {SPRINTS[0].name}</Text>
+            <Text variant="label">Add to {currentSprint.name}</Text>
             <Text variant="caption" tone="muted">
               Otherwise it lands in the backlog.
             </Text>
@@ -140,7 +143,7 @@ export default function NewIssue() {
           <Pressable
             accessibilityRole="switch"
             accessibilityState={{ checked: toSprint }}
-            accessibilityLabel={`Add to ${SPRINTS[0].name}`}
+            accessibilityLabel={`Add to ${currentSprint.name}`}
             onPress={() => setToSprint((v) => !v)}
             style={{
               width: 46,

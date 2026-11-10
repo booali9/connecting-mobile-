@@ -38,7 +38,9 @@ export default function Backlog() {
   const [query, setQuery] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
-  const sprint = SPRINTS[0]
+  const sprints = useIssuesStore((s) => s.sprints)
+  // The server's when it answered, the seeded pair when it did not.
+  const sprint = sprints[0] ?? SPRINTS[0]
   const epics = useMemo(() => selectEpics(issues), [issues])
 
   const matches = (issue: Issue) =>
