@@ -374,7 +374,12 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
   error: null,
 
   hydrate: async () => {
-    if (!api.isConfigured) return
+    // A token as well as a backend. Without this, a cold start on the
+    // sign-in screen fired /api/tasks and /api/sprints with no
+    // Authorization header, took two 401s, and put them in the console --
+    // then repeated both successfully a second later once somebody signed
+    // in. Nothing was broken by it; nothing was gained either.
+    if (!api.isConfigured || !api.currentToken()) return
     set({ loading: true, error: null })
     try {
       const [tasks, sprints] = await Promise.all([api.allTasks(200), api.allSprints()])
