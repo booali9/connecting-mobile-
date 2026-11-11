@@ -53,6 +53,13 @@ export default function CompanyTabs() {
         }}
       />
       <Tabs.Screen
+        name="meetings"
+        options={{
+          title: 'Meetings',
+          tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="board"
         options={{
           title: 'Board',

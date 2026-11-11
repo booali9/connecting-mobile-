@@ -242,6 +242,76 @@ export async function allSprints(): Promise<ServerSprint[]> {
   return result.sprints ?? []
 }
 
+/* ------------------------------------------------------------- meetings --- */
+
+export type ServerMeeting = {
+  id: string
+  title: string
+  description?: string | null
+  scheduledDate?: string | null
+  duration?: number
+  status?: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'ANALYZING'
+  aiNotesRequested?: boolean
+  aiSummary?: string | null
+  aiKeyPoints?: string[]
+  aiDecisions?: string[]
+  aiNextSteps?: string[]
+  transcriptText?: string | null
+  organizer?: { id: string; firstName: string; lastName: string }
+  participants?: { userId?: string; user?: { firstName?: string; lastName?: string } }[]
+  actionItems?: {
+    id: string
+    description: string
+    priority: string
+    assignedToId: string | null
+  }[]
+  project?: { id: string; name: string } | null
+  [key: string]: unknown
+}
+
+export async function allMeetings(limit = 50): Promise<ServerMeeting[]> {
+  const result = await request<{ meetings?: ServerMeeting[] }>(
+    `/api/meetings?limit=${limit}`
+  )
+  return result.meetings ?? []
+}
+
+/** `text` and `language`, not `transcript`. Read from the controller. */
+export async function uploadTranscript(
+  id: string,
+  text: string,
+  language = 'en'
+): Promise<ServerMeeting> {
+  const result = await request<{ meeting: ServerMeeting }>(
+    `/api/meetings/${id}/transcript`,
+    { method: 'PUT', body: { text, language } }
+  )
+  return result.meeting
+}
+
+/**
+ * Read the transcript with a model and store what it found.
+ *
+ * Several seconds of real work, so whatever calls this needs a pending
+ * state. The reply carries `usage`, which is what the AI figures on the
+ * analytics screens are counted from.
+ */
+export async function analyzeMeeting(id: string): Promise<{
+  meeting: ServerMeeting
+  usage: { provider: string; model: string; tokensUsed: number; responseTimeMs: number }
+}> {
+  return request(`/api/meetings/${id}/analyze`, { method: 'POST' })
+}
+
+/** Turn the action items the analysis found into tasks with real keys. */
+export async function createTasksFromMeeting(id: string): Promise<ServerMeeting> {
+  const result = await request<{ meeting: ServerMeeting }>(
+    `/api/meetings/${id}/create-tasks`,
+    { method: 'POST' }
+  )
+  return result.meeting
+}
+
 export async function updateTask(
   id: string,
   patch: Partial<ServerTask>
